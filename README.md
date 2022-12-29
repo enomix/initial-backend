@@ -298,7 +298,7 @@ public class UserServiceTests {
 
 ### 3. 编写返回体
 
-编写controller层之前, 先将返回类给写出来, 便于返回状态码和预支对应的状态信息还有内容体. 创建`common/BaseResponse.java`
+编写controller层之前, 先将返回类给写出来, 便于返回状态码和与之对应的状态信息还有内容体. 创建`common/BaseResponse.java`
 
 ```java
 /**
@@ -560,3 +560,7 @@ spring:
 ```
 
 启动项目, 访问api文档地址http://localhost:8080/doc.html (ip+端口+/doc.html)
+
+## 2. 项目优化
+1. 优化登录流程, 避免重复登录(使用jwt)
+
