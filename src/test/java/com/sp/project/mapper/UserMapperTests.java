@@ -1,5 +1,6 @@
 package com.sp.project.mapper;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sp.project.model.User;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,5 +15,12 @@ public class UserMapperTests {
     void testSelect() {
         User user = userMapper.selectById(1);
         System.out.println(user);
+    }
+
+    @Test
+    void testFindPage() {
+        Page<User> userPage = new Page<>();
+        Page<User> page = userMapper.findPage(userPage, "张");
+        System.out.println(page);
     }
 }

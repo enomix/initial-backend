@@ -18,6 +18,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.xml.transform.Result;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -128,6 +129,12 @@ public class UserController {
         return ResultUtils.success(b);
     }
 
+    @PostMapping("/delete/batch")
+    public BaseResponse<Boolean> deleteBatchUsers(@RequestBody List<Integer> ids) {
+        boolean b = userService.removeByIds(ids);
+        return ResultUtils.success(b);
+    }
+
     /**
      * 更新用户
      * @param userUpdateRequest
@@ -205,6 +212,28 @@ public class UserController {
         QueryWrapper<User> queryWrapper = new QueryWrapper<>(userQuery);
         Page<User> userPage = userService.page(new Page<>(current, size), queryWrapper);
         Page<UserVO> userVOPage = new PageDTO<>(userPage.getCurrent(), userPage.getSize(), userPage.getTotal());
+        List<UserVO> userVOList = userPage.getRecords().stream().map(user -> {
+            UserVO userVO = new UserVO();
+            BeanUtils.copyProperties(user, userVO);
+            return userVO;
+        }).collect(Collectors.toList());
+        userVOPage.setRecords(userVOList);
+        return ResultUtils.success(userVOPage);
+    }
+
+    /**
+     * 用户模糊分页查询
+     * @param current 当前页
+     * @param pageSize 页面大小
+     * @param username 用户名
+     * @return
+     */
+    @GetMapping("/page")
+    public BaseResponse<Page<UserVO>> listUserByPageAndSearching (@RequestParam Integer current,
+                                                                  @RequestParam Integer pageSize,
+                                                                  @RequestParam(defaultValue = "") String username) {
+        Page<User> userPage = userService.listUserByPageAndSearching(new Page<>(current, pageSize), username);
+        PageDTO<UserVO> userVOPage = new PageDTO<>(userPage.getCurrent(), userPage.getSize(), userPage.getTotal());
         List<UserVO> userVOList = userPage.getRecords().stream().map(user -> {
             UserVO userVO = new UserVO();
             BeanUtils.copyProperties(user, userVO);

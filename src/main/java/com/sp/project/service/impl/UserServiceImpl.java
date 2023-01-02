@@ -1,11 +1,13 @@
 package com.sp.project.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.sp.project.common.ErrorCode;
 import com.sp.project.exception.BusinessException;
 import com.sp.project.mapper.UserMapper;
 import com.sp.project.model.User;
+import com.sp.project.model.vo.UserVO;
 import com.sp.project.service.UserService;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.ibatis.annotations.Param;
@@ -132,5 +134,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         //移除登录态
         request.getSession().removeAttribute(USER_LOGIN_STATE);
         return true;
+    }
+
+    @Override
+    public Page<User> listUserByPageAndSearching(Page<User> objectPage, String username) {
+        Page<User> page = userMapper.findPage(objectPage, username);
+        return page;
     }
 }

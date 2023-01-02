@@ -1,7 +1,9 @@
 package com.sp.project.service;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.sp.project.model.User;
+import com.sp.project.model.vo.UserVO;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -48,4 +50,7 @@ public interface UserService extends IService<User> {
      * @return
      */
     boolean userLogout(HttpServletRequest request);
+
+
+    Page<User> listUserByPageAndSearching(Page<User> objectPage, String username);
 }
