@@ -564,3 +564,109 @@ spring:
 ## 2. 项目优化
 1. 优化登录流程, 避免重复登录(使用jwt)
 
+2. 添加用户导入导出excel数据功能
+
+先引入两个库, 修改`pom.xml`
+
+```xml
+		<!--导入导出excel表格所需的两个依赖-->
+		<!--hutool工具类库-->
+		<dependency>
+			<groupId>cn.hutool</groupId>
+			<artifactId>hutool-all</artifactId>
+			<version>5.7.20</version>
+		</dependency>
+		<!--poi-ooxml-->
+		<dependency>
+			<groupId>org.apache.poi</groupId>
+			<artifactId>poi-ooxml</artifactId>
+			<version>4.1.2</version>
+		</dependency>
+	</dependencies>
+```
+
+控制器里面添加接口
+
+```java
+    /**
+     * excel导出接口
+     * @param response
+     * @throws Exception
+     */
+    @GetMapping("export")
+    public void export(HttpServletResponse response) throws Exception {
+        //从数据库中查询出所有的数据
+        List<User> list = userService.list();
+        // 通过工具类创建writer 写出到磁盘路径
+//        ExcelWriter writer = ExcelUtil.getWriter(filesUploadPath + "/用户信息.xlsx");
+
+        //在内存中操作, 写出到浏览器
+        ExcelWriter writer = ExcelUtil.getWriter();
+        //自定义表格的标题别名(数据库英文字段名转化为想要的格式)
+        writer.addHeaderAlias("userName", "用户名");
+        writer.addHeaderAlias("userAccount", "账号");
+        writer.addHeaderAlias("userAvatar", "头像");
+        writer.addHeaderAlias("gender", "性别");
+        writer.addHeaderAlias("userRole", "角色权限");
+        writer.addHeaderAlias("userPassword", "密码");
+        writer.addHeaderAlias("createTime", "创建时间");
+        writer.addHeaderAlias("updateTime", "修改时间");
+
+        //写出list内的对象到excel, 使用默认样式, 强制输出标题
+        writer.write(list, true);
+
+        // 设置浏览器响应的格式
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=utf-8");
+        String fileName = URLEncoder.encode("用户信息", "UTF-8");
+        response.setHeader("Content-Disposition", "attachment;filename=" + fileName + ".xlsx");
+
+        ServletOutputStream out = response.getOutputStream();
+        writer.flush(out, true);
+        out.close();
+        writer.close();
+    }
+```
+
+导入接口
+
+```java
+
+    /**
+     * 导入Excel到数据库
+     * @param file
+     * @return
+     * @throws Exception
+     */
+    @PostMapping("/import")
+    public BaseResponse<Boolean> importExcel(MultipartFile file) throws Exception {
+        InputStream inputStream = file.getInputStream();
+        ExcelReader reader = ExcelUtil.getReader(inputStream);
+
+        // 方式1：(推荐) 通过 javabean的方式读取Excel内的对象，但是要求表头必须是英文，跟javabean的属性要对应起来
+//        List<User> list = reader.readAll(User.class);
+
+        // 方式2: 忽略表头的中文, 直接读取表的内容
+        List<List<Object>> list = reader.read(1);
+        ArrayList<User> users = CollUtil.newArrayList();
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        System.out.println(list);
+        for (List<Object> row : list) {
+            User user = new User();
+            user.setUserName(row.get(1).toString());
+            user.setUserAccount(row.get(2).toString());
+            user.setUserAvatar(row.get(3).toString());
+            user.setGender(row.get(4).toString() == null ? null: Integer.valueOf(row.get(4).toString()));
+
+            user.setUserRole(row.get(5).toString());
+            user.setUserPassword(row.get(6).toString());
+            user.setCreateTime(simpleDateFormat.parse(row.get(7).toString()));
+            user.setUpdateTime(simpleDateFormat.parse(row.get(8).toString()));
+            user.setIsDelete(0);
+            users.add(user);
+        }
+
+        userService.saveBatch(users);
+
+        return ResultUtils.success(true);
+    }
+```

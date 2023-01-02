@@ -1,5 +1,9 @@
 package com.sp.project.controller;
 
+import cn.hutool.core.collection.CollUtil;
+import cn.hutool.poi.excel.ExcelReader;
+import cn.hutool.poi.excel.ExcelUtil;
+import cn.hutool.poi.excel.ExcelWriter;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.plugins.pagination.PageDTO;
@@ -16,9 +20,18 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import javax.xml.transform.Result;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -241,5 +254,82 @@ public class UserController {
         }).collect(Collectors.toList());
         userVOPage.setRecords(userVOList);
         return ResultUtils.success(userVOPage);
+    }
+
+    /**
+     * excel导出接口
+     * @param response
+     * @throws Exception
+     */
+    @GetMapping("export")
+    public void export(HttpServletResponse response) throws Exception {
+        //从数据库中查询出所有的数据
+        List<User> list = userService.list();
+        // 通过工具类创建writer 写出到磁盘路径
+//        ExcelWriter writer = ExcelUtil.getWriter(filesUploadPath + "/用户信息.xlsx");
+
+        //在内存中操作, 写出到浏览器
+        ExcelWriter writer = ExcelUtil.getWriter();
+        //自定义表格的标题别名(数据库英文字段名转化为想要的格式)
+        writer.addHeaderAlias("userName", "用户名");
+        writer.addHeaderAlias("userAccount", "账号");
+        writer.addHeaderAlias("userAvatar", "头像");
+        writer.addHeaderAlias("gender", "性别");
+        writer.addHeaderAlias("userRole", "角色权限");
+        writer.addHeaderAlias("userPassword", "密码");
+        writer.addHeaderAlias("createTime", "创建时间");
+        writer.addHeaderAlias("updateTime", "修改时间");
+
+        //写出list内的对象到excel, 使用默认样式, 强制输出标题
+        writer.write(list, true);
+
+        // 设置浏览器响应的格式
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=utf-8");
+        String fileName = URLEncoder.encode("用户信息", "UTF-8");
+        response.setHeader("Content-Disposition", "attachment;filename=" + fileName + ".xlsx");
+
+        ServletOutputStream out = response.getOutputStream();
+        writer.flush(out, true);
+        out.close();
+        writer.close();
+    }
+
+    /**
+     * 导入Excel到数据库
+     * @param file
+     * @return
+     * @throws Exception
+     */
+    @PostMapping("/import")
+    public BaseResponse<Boolean> importExcel(MultipartFile file) throws Exception {
+        InputStream inputStream = file.getInputStream();
+        ExcelReader reader = ExcelUtil.getReader(inputStream);
+
+        // 方式1：(推荐) 通过 javabean的方式读取Excel内的对象，但是要求表头必须是英文，跟javabean的属性要对应起来
+//        List<User> list = reader.readAll(User.class);
+
+        // 方式2: 忽略表头的中文, 直接读取表的内容
+        List<List<Object>> list = reader.read(1);
+        ArrayList<User> users = CollUtil.newArrayList();
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        System.out.println(list);
+        for (List<Object> row : list) {
+            User user = new User();
+            user.setUserName(row.get(1).toString());
+            user.setUserAccount(row.get(2).toString());
+            user.setUserAvatar(row.get(3).toString());
+            user.setGender(row.get(4).toString() == null ? null: Integer.valueOf(row.get(4).toString()));
+
+            user.setUserRole(row.get(5).toString());
+            user.setUserPassword(row.get(6).toString());
+            user.setCreateTime(simpleDateFormat.parse(row.get(7).toString()));
+            user.setUpdateTime(simpleDateFormat.parse(row.get(8).toString()));
+            user.setIsDelete(0);
+            users.add(user);
+        }
+
+        userService.saveBatch(users);
+
+        return ResultUtils.success(true);
     }
 }

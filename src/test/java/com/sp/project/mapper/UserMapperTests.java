@@ -6,6 +6,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+
 @SpringBootTest
 public class UserMapperTests {
     @Autowired
@@ -22,5 +25,12 @@ public class UserMapperTests {
         Page<User> userPage = new Page<>();
         Page<User> page = userMapper.findPage(userPage, "张");
         System.out.println(page);
+    }
+
+    @Test
+    void testDate() throws ParseException {
+        String str = "2022-12-17 23:36:31";
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        System.out.println(simpleDateFormat.parse(str));
     }
 }
