@@ -10,6 +10,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.PageDTO;
 import com.sp.project.common.BaseResponse;
 import com.sp.project.common.ErrorCode;
 import com.sp.project.common.ResultUtils;
+import com.sp.project.common.TokenUtils;
 import com.sp.project.exception.BusinessException;
 import com.sp.project.model.User;
 import com.sp.project.model.dto.user.*;
@@ -67,7 +68,7 @@ public class UserController {
      * @return
      */
     @PostMapping("/login")
-    public BaseResponse<User> userLogin(@RequestBody UserLoginRequest userLoginRequest, HttpServletRequest request) {
+    public BaseResponse<UserVO> userLogin(@RequestBody UserLoginRequest userLoginRequest, HttpServletRequest request) {
         if (userLoginRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
@@ -77,7 +78,12 @@ public class UserController {
              throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         User user = userService.userLogin(userAccount, userPassword, request);
-        return ResultUtils.success(user);
+        UserVO userVO = new UserVO();
+        BeanUtils.copyProperties(user, userVO);
+        //设置token
+        String token = TokenUtils.genToken(userVO.getId().toString());
+        userVO.setToken(token);
+        return ResultUtils.success(userVO);
     }
 
     /**
@@ -142,6 +148,11 @@ public class UserController {
         return ResultUtils.success(b);
     }
 
+    /**
+     * 批量删除用户
+     * @param ids
+     * @return
+     */
     @PostMapping("/delete/batch")
     public BaseResponse<Boolean> deleteBatchUsers(@RequestBody List<Integer> ids) {
         boolean b = userService.removeByIds(ids);

@@ -1,4 +1,8 @@
 spring:
+  servlet:
+    multipart:
+      max-file-size: 20MB # springboot上传和下载最大文件设置. 默认为1MB
+      max-request-size: 20MB
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/my_initial_db?characterEncoding=utf-8&userSSL=false
@@ -20,3 +24,7 @@ mybatis-plus:
       logic-not-delete-value: 0 # 逻辑未删除值(默认为 0)
 server:
   port: 9090 #后端项目运行端口
+
+files:
+  upload:
+    path: /Users/enomix/Pictures/files/

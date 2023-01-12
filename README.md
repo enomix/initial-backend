@@ -564,6 +564,176 @@ spring:
 ## 2. 项目优化
 1. 优化登录流程, 避免重复登录(使用jwt)
 
+使用jwt
+引入jwt依赖 `pom.xml`
+```xml
+		<!-- 引入jwt-->
+		<dependency>
+			<groupId>com.auth0</groupId>
+			<artifactId>java-jwt</artifactId>
+			<version>3.10.3</version>
+		</dependency>
+```
+编写一个jwt工具类, 存放生成token的方法 `TokenUtils.java`
+
+```java
+package com.sp.project.common;
+
+import cn.hutool.core.date.DateUtil;
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.algorithms.Algorithm;
+
+import java.util.Date;
+
+import static com.sp.project.constant.CommonConstant.SECRET;
+
+/**
+ * jwt工具类, 生成和校验jwt
+ */
+public class TokenUtils {
+
+    /**
+     * 生成token, 设置token超时时间
+     * @param userId
+     * @return
+     */
+    public static String genToken(String userId) {
+        return JWT.create().withAudience(userId) //将 User ID保存到token里面, 作为载荷
+                .withExpiresAt(DateUtil.offsetHour(new Date(), 2)) //超时设置, 两个小时后token过期
+                .sign(Algorithm.HMAC256(SECRET));//以一个常量作为token的密钥
+    }
+    
+}
+
+```
+
+编写jwt拦截器, 将所有`header`里没有带token的请求||token验证失败的请求给拒绝
+
+```java
+package com.sp.project.config.interceptor;
+
+import cn.hutool.core.util.StrUtil;
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.JWTVerifier;
+import com.auth0.jwt.algorithms.Algorithm;
+import com.auth0.jwt.exceptions.JWTDecodeException;
+import com.auth0.jwt.exceptions.JWTVerificationException;
+import com.sp.project.common.ErrorCode;
+import com.sp.project.exception.BusinessException;
+import com.sp.project.model.User;
+import com.sp.project.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.method.HandlerMethod;
+import org.springframework.web.servlet.HandlerInterceptor;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import static com.sp.project.constant.CommonConstant.SECRET;
+
+/**
+ * jwt拦截器, 验证token再放行
+ */
+public class JwtInterceptor implements HandlerInterceptor {
+
+    @Autowired
+    private UserService userService;
+
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+        String token = request.getHeader("token");
+
+        // 如果不是映射到方法直接通过
+        if(!(handler instanceof HandlerMethod)){
+            return true;
+        }
+
+        HandlerMethod handlerMethod=(HandlerMethod)handler;
+        //判断如果请求的类是swagger的控制器，直接通行。
+        if(handlerMethod.getBean().getClass().getName().equals("springfox.documentation.oas.web.OpenApiControllerWebMvc")){
+            return  true;
+        }
+        // 执行认证
+        if (StrUtil.isBlank(token)) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "没有权限");
+        }
+        // 获取 token 中的 user id
+        String userId;
+        try {
+            userId = JWT.decode(token).getAudience().get(0);
+        } catch (JWTDecodeException j) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "token验证失败，请重新登录");
+        }
+        // 根据token中的userid查询数据库
+        User user = userService.getById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "用户不存在，请重新登录");
+        }
+        // 加签验证 token
+        JWTVerifier jwtVerifier = JWT.require(Algorithm.HMAC256(SECRET)).build();
+        try {
+            jwtVerifier.verify(token); // 验证token
+        } catch (JWTVerificationException e) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "token验证失败，请重新登录");
+        }
+        return true;
+    }
+}
+```
+
+拦截器配置放行一些资源, 不用经过jwt验证
+
+```java
+import com.sp.project.config.interceptor.JwtInterceptor;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+/**
+ * 配置jwt拦截器的放行
+ */
+@Configuration
+public class InterceptorConfig implements WebMvcConfigurer {
+
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(jwtInterceptor())
+                .addPathPatterns("/**")  // 拦截所有请求，通过判断token是否合法来决定是否需要登录
+                .excludePathPatterns("/user/login", "/user/register", "/**/export", "/**/import")
+                .excludePathPatterns("/swagger-resources/**","/doc.html", "/v2/**", "/webjars/**", "/static/**","/templates/**","/error");//knife4j资源放行
+
+    }
+
+    @Bean
+    public JwtInterceptor jwtInterceptor() {
+        return new JwtInterceptor();
+    }
+
+}
+
+```
+knife4j除了以上放行的静态资源之外, 还要放行请求接口, 才能显示所有的请求. 编辑jwt的拦截器`JwtInterceptor`, 添加放行
+
+```java
+        HandlerMethod handlerMethod=(HandlerMethod)handler;
+        //判断如果请求的类是swagger的控制器，直接通行。
+        if(handlerMethod.getBean().getClass().getName().equals("springfox.documentation.oas.web.OpenApiControllerWebMvc")){
+        return  true;
+        }
+```
+
+以上jwt相关就配置好了, 只需要在控制器中发送token给前端, 前端接收到就保存到浏览器的localStorage中, 并且每次发送请求就在header中添加上token的参数, 后端就能进行jwt处理了.
+
+拿用户登录来举例, `UserController` 里面生成一个token, 写入到返回给前端的结果对象`userVO`中
+```java
+String token = TokenUtils.genToken(userVO.getId().toString());
+userVO.setToken(token);
+```
+前端发送请求可以在`axios`配置的拦截器中设置每次发送请求的时候都在请求头中添加`token`参数.
+
+如果使用`knife4j`接口文档的时候, 发送不了请求, 显示所有的请求都没有权限, 那是因为请求头没有token. 可以在接口文档中调用login接口, 将返回结果中的`token`复制到 knife4j 的`文档管理>全局参数配置>添加参数`中, 添加token, 这样每次发送请求的时候请求头都会带上token参数了
+
 2. 添加用户导入导出excel数据功能
 
 先引入两个库, 修改`pom.xml`
@@ -670,3 +840,5 @@ spring:
         return ResultUtils.success(true);
     }
 ```
+
+
