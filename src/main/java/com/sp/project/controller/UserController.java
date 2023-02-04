@@ -20,6 +20,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -45,6 +46,9 @@ public class UserController {
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private RedisTemplate redisTemplate;
 
     @PostMapping("/register")
     public BaseResponse<Long> userRegister(@RequestBody UserRegisterRequest userRegisterRequest) {
@@ -111,6 +115,21 @@ public class UserController {
         UserVO userVO = new UserVO();
         BeanUtils.copyProperties(user, userVO);
         return ResultUtils.success(userVO);
+    }
+
+    /**
+     * 获取当前登录的用户 redis
+     * @param request
+     * @return
+     */
+    @GetMapping("/get/login/redis")
+    public BaseResponse<UserVO> getLoginUserRedis(HttpServletRequest request) {
+        User user = userService.getLoginUser(request);
+        UserVO userVO = new UserVO();
+        BeanUtils.copyProperties(user, userVO);
+        redisTemplate.opsForValue().set("loginUser", userVO);
+        UserVO loginUser = (UserVO) redisTemplate.opsForValue().get("loginUser");
+        return ResultUtils.success(loginUser);
     }
 
     /**
