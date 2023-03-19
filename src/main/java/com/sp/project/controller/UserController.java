@@ -14,7 +14,10 @@ import com.sp.project.common.TokenUtils;
 import com.sp.project.exception.BusinessException;
 import com.sp.project.model.User;
 import com.sp.project.model.dto.user.*;
+import com.sp.project.model.vo.LoginVO;
+import com.sp.project.model.vo.SysMenuVO;
 import com.sp.project.model.vo.UserVO;
+import com.sp.project.service.SysMenuService;
 import com.sp.project.service.UserService;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
@@ -47,6 +50,10 @@ public class UserController {
     @Autowired
     private UserService userService;
 
+
+    @Autowired
+    private SysMenuService sysMenuService;
+
     @Autowired
     private RedisTemplate redisTemplate;
 
@@ -72,7 +79,7 @@ public class UserController {
      * @return
      */
     @PostMapping("/login")
-    public BaseResponse<UserVO> userLogin(@RequestBody UserLoginRequest userLoginRequest, HttpServletRequest request) {
+    public BaseResponse<LoginVO> userLogin(@RequestBody UserLoginRequest userLoginRequest, HttpServletRequest request) {
         if (userLoginRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
@@ -87,7 +94,13 @@ public class UserController {
         //设置token
         String token = TokenUtils.genToken(userVO.getId().toString());
         userVO.setToken(token);
-        return ResultUtils.success(userVO);
+
+        List<SysMenuVO> sysMenuVOList = sysMenuService.queryRoleMenuTree(user.getId());
+
+        LoginVO loginVO = new LoginVO();
+        loginVO.setUserVO(userVO);
+        loginVO.setSysMenuVOList(sysMenuVOList);
+        return ResultUtils.success(loginVO);
     }
 
     /**

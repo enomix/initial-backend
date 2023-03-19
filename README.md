@@ -562,10 +562,11 @@ spring:
 启动项目, 访问api文档地址http://localhost:8080/doc.html (ip+端口+/doc.html)
 
 ## 2. 项目优化
-1. 优化登录流程, 避免重复登录(使用jwt)
+### 1. 使用jwt登录
 
 使用jwt
 引入jwt依赖 `pom.xml`
+
 ```xml
 		<!-- 引入jwt-->
 		<dependency>
@@ -734,7 +735,7 @@ userVO.setToken(token);
 
 如果使用`knife4j`接口文档的时候, 发送不了请求, 显示所有的请求都没有权限, 那是因为请求头没有token. 可以在接口文档中调用login接口, 将返回结果中的`token`复制到 knife4j 的`文档管理>全局参数配置>添加参数`中, 添加token, 这样每次发送请求的时候请求头都会带上token参数了
 
-2. 添加用户导入导出excel数据功能
+### 2. 用户数据导入导出excel
 
 先引入两个库, 修改`pom.xml`
 
@@ -841,4 +842,45 @@ userVO.setToken(token);
     }
 ```
 
+### 3. 权限路由
+
+[参考博客](http://www.justdojava.com/2020/06/30/springboot-menu-auth/)
+
+#### 3.1 数据库设计
+
+菜单表sys_menu
+
+| 表名     | 类型    | 注释                                    |
+| -------- | :------ | --------------------------------------- |
+| id       | int     | 主键                                    |
+| name     | varchar | 名称                                    |
+| menuCode | varchar | 菜单编码                                |
+| parentId | int     | 父节点                                  |
+| nodeType | varchar | 节点类型，1文件夹，2页面，3按钮         |
+| icon     | varchar | 图标地址                                |
+| sort     | int     | 排序号                                  |
+| linkUrl  | varchar | 页面对应的地址                          |
+| level    | int     | 层次                                    |
+| path     | varchar | 树id的路径 整个层次上的路径id，逗号分隔 |
+| isDelete | tinyint | 逻辑删除 1已删除，2未删除               |
+
+建表语句
+
+```sql
+CREATE TABLE sys_menu (
+  id bigint(20) NOT NULL COMMENT '主键',
+  name varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT '名称',
+  menu_code varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT '菜单编码',
+  parent_id bigint(20) DEFAULT NULL COMMENT '父节点',
+  node_type tinyint(4) NOT NULL DEFAULT '1' COMMENT '节点类型，1文件夹，2页面，3按钮',
+  icon_url varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '图标地址',
+  sort int(11) NOT NULL DEFAULT '1' COMMENT '排序号',
+  link_url varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '页面对应的地址',
+  level int(11) NOT NULL DEFAULT '0' COMMENT '层次',
+  path varchar(2500) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '树id的路径 整个层次上的路径id，逗号分隔，想要找父节点特别快',
+  is_delete tinyint(4) NOT NULL DEFAULT '0' COMMENT '是否删除 1：已删除；0：未删除',
+  PRIMARY KEY (id) USING BTREE,
+  KEY idx_parent_id (parent_id) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='菜单表';
+```
 
